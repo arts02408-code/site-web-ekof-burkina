@@ -1,6 +1,6 @@
 // Public configuration for the EKOF storefront.
 window.EKOF_CONFIG = Object.freeze({
-  catalogApi: "/wp-json/wc/store",
+  catalogApi: "https://ekofburkina.com/wp-json/wc/store",
   whatsappPhone: "22654528105",
   phone: "+226 75 88 30 29",
   phoneSecondary: "+226 25 65 72 38",

@@ -206,30 +206,34 @@
     if (window.location.protocol === "file:") {
       return fetchLocalPreviewApi(path, params);
     }
-    const url = new URL(`${config.catalogApi.replace(/\/$/, "")}/${path}`, window.location.origin);
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== "" && value !== null && value !== undefined) url.searchParams.set(key, String(value));
-    });
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 20000);
-    let response;
-    let body;
     try {
+      const url = new URL(`${config.catalogApi.replace(/\/$/, "")}/${path}`);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) url.searchParams.set(key, String(value));
+      });
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 20000);
+      let response;
+      let body;
       response = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
       body = await response.text();
+      window.clearTimeout(timeout);
+      const payload = parseApiJson(body);
+      if (!response.ok) {
+        throw new Error(`Le catalogue EKOF répond avec le statut ${response.status}.`);
+      }
+      return { payload, response };
     } catch (error) {
       if (error.name === "AbortError") {
-        throw new Error("Le catalogue EKOF n'a pas répondu dans le délai prévu. Réessayez dans quelques instants.");
+        console.warn("Catalogue EKOF en direct indisponible : affichage de l'aperçu enregistré.");
       }
-      throw new Error("Connexion au catalogue EKOF impossible. Vérifiez le réseau et que le site est servi sur le même domaine que WooCommerce.");
-    } finally {
-      window.clearTimeout(timeout);
+      if (window.EKOF_CATALOGUE_APERCU) {
+        return fetchLocalPreviewApi(path, params);
+      }
+      throw error instanceof Error && error.message
+        ? error
+        : new Error("Connexion au catalogue EKOF impossible. Vérifiez votre connexion Internet.");
     }
-    const payload = parseApiJson(body);
-    if (!response.ok) {
-      throw new Error(`Le catalogue EKOF répond avec le statut ${response.status}.`);
-    }
-    return { payload, response };
   };
 
   const fetchLocalPreviewApi = (path, params) => {
@@ -683,9 +687,7 @@
   }
 
   const initialize = async () => {
-    if (window.location.protocol === "file:") {
-      await loadLocalPreviewData();
-    }
+    await loadLocalPreviewData();
     await Promise.all([
       loadCategories().catch((error) => {
         categoryLoadError = error.message;
